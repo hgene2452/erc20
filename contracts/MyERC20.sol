@@ -13,7 +13,7 @@ contract MyERC20 is IERC20 {
     // - immutable 키워드를 사용하여 배포 시에만 값을 설정하고 이후에는 변경 불가
     uint8 private immutable _decimals;
     // - 컨트랙트를 배포한 admin
-    address public owner;
+    address private owner;
 
     // ==== ERC-20 standard state variables ====
     uint256 private _totalSupply;
