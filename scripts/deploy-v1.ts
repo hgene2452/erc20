@@ -54,8 +54,8 @@ async function main() {
   console.log("ProxyAdmin deployed:", proxyAdminAddr);
 
   // 3) Encode initialize calldata
-  const name = "MyProxyToken0104";
-  const symbol = "MPTK0104";
+  const name = "MyERC20ProxyToken";
+  const symbol = "MEPTK";
   const decimals = 18;
   const initialSupplyWhole = 100;
   const owner = deployer.address;

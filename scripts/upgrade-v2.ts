@@ -19,8 +19,8 @@ async function main() {
     maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
   });
 
-  const PROXY_ADDRESS = "0x8D4D0b5adA7E5311B591D0ed64433E2889562183";
-  const PROXY_ADMIN_ADDRESS = "0x081E3Ed1218c2c005A2399b07DC8C732Df32Eed1";
+  const PROXY_ADDRESS = "0xe22c384985b6d570259ec1C561b687ECF9F1ae6E";
+  const PROXY_ADMIN_ADDRESS = "0x74160f16Ff505460A8C000F303a0F67225FEb677";
 
   // (0) ProxyAdmin 소유자 확인
   const proxyAdmin = await ethers.getContractAt("ProxyAdmin", PROXY_ADMIN_ADDRESS, deployer);
