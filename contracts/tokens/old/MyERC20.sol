@@ -2,7 +2,7 @@
 // Solidity 0.4.17 버전 이상
 pragma solidity ^0.8.20;
 
-import "./IERC20.sol";
+import "../interfaces/IERC20.sol";
 
 contract MyERC20 is IERC20 {
     // ==== Token metadata ====

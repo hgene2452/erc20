@@ -1,128 +1,136 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 /**
  * @title ERC1967Storage
- * @dev
- * ERC1967 표준에 따라 프록시가 사용하는 핵심 주소(implementation, admin 등)를
- * "충돌 위험이 매우 낮은 고정 storage slot"에 저장하고 읽어오는 기능을 제공하는 유틸리티.
  *
- * - TransparentUpgradeableProxy 같은 프록시 컨트랙트가 상속해서 사용한다.
- * - delegatecall 환경에서 "프록시 storage"와 "구현 컨트랙트 storage"가 충돌하면 대참사가 나기 때문에
- *   (balances가 admin 주소로 덮이는 등) 반드시 표준 슬롯을 쓰는 게 안전하다.
- * 
- * 표준 슬롯:
- * - IMPLEMENTATION_SLOT: keccak256("eip1967.proxy.implementation") - 1
- * - ADMIN_SLOT: keccak256("eip1967.proxy.admin") - 1
+ * @dev
+ * - implementation / admin 주소를 충돌 없는 고정 슬롯에 저장/관리한다.
+ * - 업그레이드 / 관리 로직에 필요한 공통 유틸을 제공한다.
  */
- abstract contract ERC1967Storage {
-    // =============================== EVENTS ===============================
-    /**
-     * @dev 구현(implementation) 주소가 업그레이드될 때 발생하는 이벤트.
-     */
+abstract contract ERC1967Storage {
     event Upgraded(address indexed implementation);
-
-    /**
-     * @dev 관리자(admin) 주소가 변경될 때 발생하는 이벤트.
-     */
     event AdminChanged(address previousAdmin, address newAdmin);
 
-    // =============================== ERRORS ===============================
     error ERC1967InvalidImplementation(address implementation);
     error ERC1967InvalidAdmin(address admin);
 
-    // =============================== ERC1967 SLOTS ===============================
-    /**
-     * @dev
-     * keccak256("eip1967.proxy.implementation") - 1
-     * 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
-     */
     bytes32 internal constant IMPLEMENTATION_SLOT =
-        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-
-    /**
-     * @dev
-     * keccak256("eip1967.proxy.admin") - 1
-     * 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
-     */
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc; // keccak256("eip1967.proxy.implementation") - 1
     bytes32 internal constant ADMIN_SLOT =
-        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-    
-    // =============================== INTERNAL SLOT HELPERS ===============================
-    /**
-     * @dev StorageSlot 패턴(주소 슬롯)
-     * 특정 slot 위치를 address 값 저장소로 취급하기 위한 구조체.
-     */
+        0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103; // keccak256("eip1967.proxy.admin") - 1
+
     struct AddressSlot {
         address value;
     }
-
     /**
-     * @dev slot 위치를 AddressSlot로 "캐스팅"해서 접근할 수 있게 해준다.
-     * Solidity 문법으로는 임의 slot에 직접 접근이 까다로워서 assembly를 사용한다.
+     * @dev
+     * - 임의 storage slot을 address 저장소처럼 다루기 위한 어댑터
+     * - r.value ↔ storage[slot]
      */
     function _getAddressSlot(bytes32 slot) internal pure returns (AddressSlot storage r) {
         assembly {
             r.slot := slot
         }
     }
-
-    // =============================== IMPLEMENTATION GET/SET ===============================
     /**
-     * @dev 현재 구현(implementation) 주소를 반환한다.
+     * @dev
+     * - 현재 implementation 주소 반환
+     * - ERC-1967 implementation slot에서 직접 읽어온다
      */
     function _getImplementation() internal view returns (address) {
         return _getAddressSlot(IMPLEMENTATION_SLOT).value;
     }
-
     /**
-     * @dev 구현(implementation) 주소 저장
-     * - newImplementation은 반드시 컨트랙트(code length > 0)여야 한다.
-     * - 이벤트는 여기서 emit하지 않고, 업그레이드 함수에서 emit하는 스타일도 가능하지만
-     *   보통 여기서 emit하는 편이 추적이 쉬워서 함께 제공한다.
+     * @dev
+     * - implementation slot에 새 구현 주소 저장
+     * - 컨트랙트 주소인지 검증한다
      */
     function _setImplementation(address newImplementation) internal {
         if (newImplementation.code.length == 0) {
             revert ERC1967InvalidImplementation(newImplementation);
         }
         _getAddressSlot(IMPLEMENTATION_SLOT).value = newImplementation;
-        
-        emit Upgraded(newImplementation);
     }
-
-    // =============================== ADMIN GET/SET ===============================
     /**
-     * @dev 현재 admin 주소 반환
+     * @dev
+     * - 현재 admin 주소 반환
+     * - ERC-1967 implementation slot에서 직접 읽어온다
      */
     function _getAdmin() internal view returns (address) {
         return _getAddressSlot(ADMIN_SLOT).value;
     }
-
     /**
-     * @dev admin 주소 저장
-     * - admin은 0 주소 불가
-     * - AdminChanged 이벤트도 같이 발생시켜 추적 가능하게 한다.
+     * @dev
+     * - admin slot에 새 구현 주소 저장
+     * - 주소가 0이 아님을 검증한다
      */
     function _setAdmin(address newAdmin) internal {
         if (newAdmin == address(0)) {
             revert ERC1967InvalidAdmin(address(0));
         }
-
-        address previous = _getAdmin();
         _getAddressSlot(ADMIN_SLOT).value = newAdmin;
+    }
 
+    /**
+     * @dev
+     * - implementation 교체
+     * - Upgraded 이벤트 처리
+     * - 필요 시 후속 초기화(delegatecall) 실행
+     */
+    function _upgradeToAndCall(address newImplementation, bytes memory data) internal {
+        _setImplementation(newImplementation);
+        emit Upgraded(newImplementation);
+
+        if (data.length > 0) {
+            _functionDelegateCall(newImplementation, data);
+        }
+    }
+    /**
+     * @dev
+     * - admin 교체
+     * - AdminChanged 이벤트 처리
+     */
+    function _changeAdmin(address newAdmin) internal {
+        address previous = _getAdmin();
+        _setAdmin(newAdmin);
         emit AdminChanged(previous, newAdmin);
     }
 
-    // =============================== OPTIONAL: EXTERNAL READERS ===============================
     /**
-     * @dev (선택) 외부에서 읽기 쉽게 공개 getter 제공.
+     * @dev
+     * - delegatecall 실행
+     * - 실패 시 구현 컨트랙트의 revert reason을 그대로 전달
+     */
+    function _functionDelegateCall(address target, bytes memory data) internal {
+        (bool success, bytes memory returndata) = target.delegatecall(data);
+        if (!success) {
+            _revertWithReason(returndata);
+        }
+    }
+    /**
+     * @dev
+     * - delegatecall 실패 시 revert 
+     * - reason 그대로 bubble up
+     */
+    function _revertWithReason(bytes memory returndata) internal pure {
+        assembly {
+            revert(add(returndata, 0x20), mload(returndata))
+        }
+    }
+
+    /**
+     * @dev
+     * - 외부에서 implementation 주소 조회 (디버깅/조회용)
      */
     function getImplementation() external view returns (address) {
         return _getImplementation();
     }
-
+    /**
+     * @dev
+     * - 외부에서 admin 주소 조회 (디버깅/조회용)
+     */
     function getAdmin() external view returns (address) {
         return _getAdmin();
     }
- }
+}
